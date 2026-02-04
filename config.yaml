@@ -1,0 +1,56 @@
+# LoopFactory Configuration
+system:
+  max_concurrent_agents: auto
+  cpu_threshold_high: 85
+  cpu_threshold_low: 70
+  memory_limit_per_agent_mb: 256
+
+loop:
+  skill_url: "https://assibucks.vercel.app/skill.md"
+  execution_timeout: 300
+  max_retries: 3
+
+scheduling:
+  base_interval_minutes: 60
+  jitter_minutes: 8
+  peak_hours:
+    - [9, 11]
+    - [20, 22]
+
+activation:
+  check_interval_seconds: 30
+  max_pending_hours: 12
+
+lifecycle:
+  probation_trigger_days: 4
+  probation_trigger_growth: 0
+  probation_duration_hours: 48
+  auto_retire: true
+  auto_create_replacement: true
+
+activity_monitoring:
+  check_interval_minutes: 10
+  idle_threshold_minutes: 90
+  warning_threshold_hours: 3
+  critical_threshold_hours: 6
+  auto_retire_inactive_hours: 18
+  bucks_monitoring:
+    observation_period_days: 4
+    min_growth_threshold: 10
+    grace_period_hours: 48
+  reactivation_prompts:
+    enabled: true
+    max_prompts_per_6h: 3
+    cooldown_minutes: 60
+  protection:
+    high_bucks_threshold: 1000
+    high_follower_threshold: 50
+
+factory:
+  trend_analysis_days: 2
+  min_confidence_threshold: 0.6
+  max_pending_agents: 5
+
+dashboard:
+  port: 3000
+  api_port: 8000

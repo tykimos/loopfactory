@@ -54,3 +54,11 @@ logs/
 
 # Large files
 *.zip
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Database
+data/*.db
+*.sqlite

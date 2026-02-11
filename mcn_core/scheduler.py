@@ -44,6 +44,7 @@ class HeartbeatScheduler:
         self._concurrency_controller = None
         self._inflight_heartbeats = 0
         self._inflight_lock = asyncio.Lock()
+        self._admission_lock = asyncio.Lock()
         self._default_executor: Optional[ThreadPoolExecutor] = None
 
     async def start(self):
@@ -90,11 +91,10 @@ class HeartbeatScheduler:
         # Initialize concurrency controller
         self._concurrency_controller = get_concurrency_controller()
 
-        # Sequential launch policy: one heartbeat execution at a time.
-        # New runs are started only when resource checks pass.
-        self._semaphore = asyncio.Semaphore(1)
+        # No fixed upper cap here. Admission is controlled by live resource checks.
+        self._semaphore = None
 
-        logger.info("Sequential heartbeat execution enabled (max_concurrent=1)")
+        logger.info("Resource-gated heartbeat admission enabled (no fixed max cap)")
 
         if not self.scheduler.running:
             self.scheduler.start()
@@ -230,34 +230,33 @@ class HeartbeatScheduler:
             return row['profile_name'] if row and row['profile_name'] else 'default'
 
     async def _acquire_execution_slot(self, profile_name: str):
-        """Acquire an execution slot sequentially with pre-launch resource checks."""
+        """Acquire an execution slot with serialized admission and live resource checks.
+
+        - No hard max cap is enforced here.
+        - Admission decisions are made one-by-one to avoid burst launching.
+        """
         if self._concurrency_controller:
             live_max = self._concurrency_controller.get_max_concurrent(force_recalc=True)
         else:
             live_max = 1
 
-        # Sequential gate: one heartbeat execution at a time
-        if self._semaphore is None:
-            self._semaphore = asyncio.Semaphore(1)
-        await self._semaphore.acquire()
-
-        # Wait until system resources can accept a new run
         resource_monitor = get_resource_monitor()
-        while not resource_monitor.can_run_agent():
-            await asyncio.sleep(1)
 
-        async with self._inflight_lock:
-            self._inflight_heartbeats += 1
-            return live_max
+        # Serialize admission checks so launches happen one-by-one.
+        async with self._admission_lock:
+            while not resource_monitor.can_run_agent():
+                await asyncio.sleep(1)
+
+            async with self._inflight_lock:
+                self._inflight_heartbeats += 1
+
+        return live_max
 
     async def _release_execution_slot(self):
         """Release a previously acquired execution slot."""
         async with self._inflight_lock:
             if self._inflight_heartbeats > 0:
                 self._inflight_heartbeats -= 1
-
-        if self._semaphore is not None:
-            self._semaphore.release()
 
     async def _execute_heartbeat(self, agent_id: str):
         """Execute a single heartbeat for an agent using HeartbeatManager."""

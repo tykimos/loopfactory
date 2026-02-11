@@ -18,7 +18,7 @@ class MCNAgentRunner:
 
     # SKILL_URL from config, with fallback to default
     DEFAULT_SKILL_URL = "https://assibucks.vercel.app/skill.md"
-    MAX_RETRY_ATTEMPTS = 8
+    MAX_RETRY_ATTEMPTS = 16
     RETRYABLE_ERROR_KEYWORDS = (
         "concurrency",
         "rate limit",

@@ -23,7 +23,8 @@ class HeartbeatScheduler:
     """Schedules and executes agent heartbeats using BackgroundScheduler."""
 
     # Auto-sync interval (seconds)
-    SYNC_INTERVAL = 30
+    # Keep within 10s per operational requirement.
+    SYNC_INTERVAL = 5
     # First sync should be gentle: only schedule jobs.
     # Do not burst-kickstart hundreds of immediate heartbeats.
     FIRST_SYNC_KICKSTART_MAX = 0

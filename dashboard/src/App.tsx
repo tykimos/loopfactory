@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Activity, Factory, Settings, Clock, Trophy } from 'lucide-react'
+import { LayoutDashboard, Users, Activity, Factory, Settings, Clock, Trophy, Grid3X3 } from 'lucide-react'
 import PendingActivation from './pages/PendingActivation'
 import Overview from './pages/Overview'
 import Leaderboard from './pages/Leaderboard'
 import AgentDetail from './pages/AgentDetail'
 import FactoryPage from './pages/Factory'
 import SettingsPage from './pages/Settings'
+import GridView from './pages/GridView'
 
 function Sidebar() {
   const links = [
@@ -14,6 +15,7 @@ function Sidebar() {
     { to: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
     { to: '/pending', icon: Clock, label: 'Pending' },
     { to: '/activity', icon: Activity, label: 'Activity' },
+    { to: '/gridview', icon: Grid3X3, label: 'GridView' },
     { to: '/factory', icon: Factory, label: 'Factory' },
     { to: '/settings', icon: Settings, label: 'Settings' }
   ]
@@ -67,6 +69,7 @@ export default function App() {
             <Route path="/leaderboard" element={<Leaderboard />} />
             <Route path="/pending" element={<PendingActivation />} />
             <Route path="/activity" element={<Placeholder title="Activity Monitor" />} />
+            <Route path="/gridview" element={<GridView />} />
             <Route path="/factory" element={<FactoryPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>

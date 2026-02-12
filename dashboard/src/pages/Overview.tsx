@@ -31,6 +31,7 @@ interface PrometheusResponse {
 
 interface GpuCardData {
   uuid: string
+  site: string
   server: string
   name: string
   index?: string
@@ -44,7 +45,13 @@ interface GpuCardData {
   lastUpdated?: number
 }
 
-type GpuHistoryMap = Record<string, number[]>
+interface GpuMetricHistory {
+  usage: number[]
+  memory: number[]
+  temperature: number[]
+}
+
+type GpuHistoryMap = Record<string, GpuMetricHistory>
 
 const HISTORY_POINTS = 18
 
@@ -74,6 +81,14 @@ const usageColor = (value?: number): string => {
   if (value >= 90) return '#ef4444'
   if (value >= 75) return '#f97316'
   if (value >= 55) return '#eab308'
+  return '#22c55e'
+}
+
+const temperatureColor = (value?: number): string => {
+  if (value == null) return '#475569'
+  if (value >= 85) return '#ef4444'
+  if (value >= 75) return '#f97316'
+  if (value >= 65) return '#eab308'
   return '#22c55e'
 }
 
@@ -129,10 +144,23 @@ const getGpuName = (labels: Record<string, string>): string => {
   return labels.name || labels.model || labels.product_name || 'GPU'
 }
 
+const getSiteLabel = (labels: Record<string, string>, server: string): string => {
+  const direct =
+    labels.site ||
+    labels.site_name ||
+    labels.site_id ||
+    labels.region ||
+    labels.dc
+  if (direct) return direct
+  const token = server.split(/[-_.]/).filter(Boolean)[0]
+  return token || 'Unknown site'
+}
+
 export default function Overview() {
   const [gpus, setGpus] = useState<GpuCardData[]>([])
   const [gpuHistory, setGpuHistory] = useState<GpuHistoryMap>({})
   const [selectedGpu, setSelectedGpu] = useState<GpuCardData | null>(null)
+  const [selectedSite, setSelectedSite] = useState<string>('all')
   const [selectedNode, setSelectedNode] = useState<string>('all')
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -173,9 +201,11 @@ export default function Overview() {
 
         let gpu = gpuMap[id]
         if (!gpu) {
+          const server = getServerLabel(labels)
           gpu = {
             uuid: id,
-            server: getServerLabel(labels),
+            site: getSiteLabel(labels, server),
+            server,
             name: getGpuName(labels),
             index: labels.index || labels.gpu || labels.minor_number || undefined,
             model: labels.model || labels.product_name || undefined,
@@ -188,6 +218,9 @@ export default function Overview() {
 
         if (!gpu.server || gpu.server === 'Unknown node') {
           gpu.server = getServerLabel(labels)
+        }
+        if (!gpu.site || gpu.site === 'Unknown site') {
+          gpu.site = getSiteLabel(labels, gpu.server)
         }
         if ((!gpu.name || gpu.name === 'GPU') && getGpuName(labels)) {
           gpu.name = getGpuName(labels)
@@ -287,9 +320,15 @@ export default function Overview() {
       setGpuHistory((prev) => {
         const next: GpuHistoryMap = {}
         nextGpus.forEach((gpu) => {
-          const current = gpu.utilization ?? 0
-          const prevSeries = prev[gpu.uuid] ?? []
-          next[gpu.uuid] = [...prevSeries.slice(-(HISTORY_POINTS - 1)), current]
+          const previous = prev[gpu.uuid] ?? { usage: [], memory: [], temperature: [] }
+          const usage = gpu.utilization ?? 0
+          const memory = gpu.memoryUtilization ?? 0
+          const temperature = Math.max(0, Math.min(100, gpu.temperature ?? 0))
+          next[gpu.uuid] = {
+            usage: [...previous.usage.slice(-(HISTORY_POINTS - 1)), usage],
+            memory: [...previous.memory.slice(-(HISTORY_POINTS - 1)), memory],
+            temperature: [...previous.temperature.slice(-(HISTORY_POINTS - 1)), temperature],
+          }
         })
         return next
       })
@@ -314,30 +353,46 @@ export default function Overview() {
   }, [fetchGpuData])
 
   const nodeGroups = useMemo(() => {
-    const groups: Record<string, GpuCardData[]> = {}
+    const groups: Record<string, { site: string; gpus: GpuCardData[] }> = {}
     gpus.forEach((gpu) => {
       const key = gpu.server || 'Unknown node'
       if (!groups[key]) {
-        groups[key] = []
+        groups[key] = { site: gpu.site || 'Unknown site', gpus: [] }
       }
-      groups[key].push(gpu)
+      groups[key].gpus.push(gpu)
     })
     return Object.entries(groups)
-      .map(([server, list]) => ({ server, gpus: list }))
+      .map(([server, entry]) => ({ server, site: entry.site, gpus: entry.gpus }))
       .sort((a, b) => a.server.localeCompare(b.server))
   }, [gpus])
 
   useEffect(() => {
+    if (selectedSite === 'all') return
+    const exists = nodeGroups.some((group) => group.site === selectedSite)
+    if (!exists) {
+      setSelectedSite('all')
+    }
+  }, [nodeGroups, selectedSite])
+
+  useEffect(() => {
     if (selectedNode === 'all') return
-    const exists = nodeGroups.some((group) => group.server === selectedNode)
+    const exists = nodeGroups.some(
+      (group) =>
+        group.server === selectedNode &&
+        (selectedSite === 'all' || group.site === selectedSite)
+    )
     if (!exists) {
       setSelectedNode('all')
     }
-  }, [nodeGroups, selectedNode])
+  }, [nodeGroups, selectedNode, selectedSite])
+
+  const filteredBySite = selectedSite === 'all'
+    ? nodeGroups
+    : nodeGroups.filter((group) => group.site === selectedSite)
 
   const filteredGroups = selectedNode === 'all'
-    ? nodeGroups
-    : nodeGroups.filter((group) => group.server === selectedNode)
+    ? filteredBySite
+    : filteredBySite.filter((group) => group.server === selectedNode)
 
   const summary = useMemo(() => {
     const total = gpus.length
@@ -353,9 +408,14 @@ export default function Overview() {
     return { total, avg, busy, idle, offline }
   }, [gpus])
 
-  const nodeOptions = useMemo(
-    () => nodeGroups.map((group) => group.server),
+  const siteOptions = useMemo(
+    () => Array.from(new Set(nodeGroups.map((group) => group.site))).sort((a, b) => a.localeCompare(b)),
     [nodeGroups]
+  )
+
+  const nodeOptions = useMemo(
+    () => filteredBySite.map((group) => group.server),
+    [filteredBySite]
   )
 
   const showInitialSpinner = isRefreshing && gpus.length === 0
@@ -383,6 +443,24 @@ export default function Overview() {
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <label className="text-xs font-medium text-[#9ce8d5]">
+              Site
+              <select
+                value={selectedSite}
+                onChange={(event) => {
+                  setSelectedSite(event.target.value)
+                  setSelectedNode('all')
+                }}
+                className="ml-2 rounded-md border border-[#19313b] bg-[#0b1419]/90 px-2 py-1 text-sm focus:border-[#2ce6a6] focus:outline-none"
+              >
+                <option value="all">All Sites</option>
+                {siteOptions.map((site) => (
+                  <option key={site} value={site}>
+                    {site}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="text-xs font-medium text-[#9ce8d5]">
               Node
               <select
@@ -492,7 +570,7 @@ export default function Overview() {
                     <GpuCard
                       key={gpu.uuid}
                       gpu={gpu}
-                      history={gpuHistory[gpu.uuid] ?? []}
+                      history={gpuHistory[gpu.uuid] ?? { usage: [], memory: [], temperature: [] }}
                       isSelected={selectedGpu?.uuid === gpu.uuid}
                       onSelect={() => setSelectedGpu(gpu)}
                     />
@@ -566,17 +644,21 @@ function GpuCard({
   isSelected,
 }: {
   gpu: GpuCardData
-  history: number[]
+  history: GpuMetricHistory
   onSelect: () => void
   isSelected: boolean
 }) {
-  const color = usageColor(gpu.utilization)
-  const paddedHistory = [...Array(Math.max(HISTORY_POINTS - history.length, 0)).fill(0), ...history].slice(-HISTORY_POINTS)
+  const usageCurrent = gpu.utilization ?? 0
+  const memoryCurrent = gpu.memoryUtilization ?? 0
+  const temperatureCurrent = gpu.temperature ?? 0
+  const usageSeries = [...Array(Math.max(HISTORY_POINTS - history.usage.length, 0)).fill(0), ...history.usage].slice(-HISTORY_POINTS)
+  const memorySeries = [...Array(Math.max(HISTORY_POINTS - history.memory.length, 0)).fill(0), ...history.memory].slice(-HISTORY_POINTS)
+  const temperatureSeries = [...Array(Math.max(HISTORY_POINTS - history.temperature.length, 0)).fill(0), ...history.temperature].slice(-HISTORY_POINTS)
 
   return (
     <button
       onClick={onSelect}
-      className={`relative h-44 rounded-lg border p-3 text-left transition hover:border-[#2ce6a6]/70 ${
+      className={`relative aspect-square rounded-lg border p-3 text-left transition hover:border-[#2ce6a6]/70 ${
         isSelected ? 'border-[#2ce6a6] shadow-[0_0_18px_rgba(44,230,166,0.35)]' : 'border-[#19313b]'
       }`}
       title={`${gpu.name} - ${gpu.server}`}
@@ -584,7 +666,7 @@ function GpuCard({
       <div
         className="pointer-events-none absolute inset-0 rounded-lg"
         style={{
-          background: `linear-gradient(140deg, rgba(8,17,23,0.96) 25%, ${color}20 100%)`,
+          background: `linear-gradient(140deg, rgba(8,17,23,0.96) 25%, ${usageColor(gpu.utilization)}20 100%)`,
         }}
       />
       <div className="relative z-10 flex h-full flex-col justify-between">
@@ -596,32 +678,72 @@ function GpuCard({
             </span>
           )}
         </div>
-        <div className="h-12 mt-2 flex items-end gap-1 rounded bg-[#071117]/70 p-1 border border-[#19313b]">
-          {paddedHistory.map((value, idx) => (
-            <div
-              key={`${gpu.uuid}-history-${idx}`}
-              className="flex-1 rounded-sm"
-              style={{
-                height: `${Math.max((value / 100) * 100, 8)}%`,
-                backgroundColor: idx === paddedHistory.length - 1 ? color : `${color}55`,
-                opacity: 0.35 + (idx / paddedHistory.length) * 0.65,
-              }}
-            />
-          ))}
-        </div>
-        <div>
-          <p className="text-3xl font-semibold" style={{ color }}>
-            {gpu.utilization != null ? `${gpu.utilization.toFixed(0)}%` : 'N/A'}
-          </p>
-          <p className="text-xs text-[#7fb7aa]">
-            Memory {formatPercent(gpu.memoryUtilization)}
-          </p>
-          <p className="text-xs text-[#4d786f]">
-            Temp {gpu.temperature != null ? `${gpu.temperature.toFixed(0)}°C` : '--'}
-          </p>
+        <div className="mt-2 space-y-1.5">
+          <MetricBarSeries
+            label="USE"
+            values={usageSeries}
+            color={usageColor(usageCurrent)}
+            suffix="%"
+            displayValue={usageCurrent.toFixed(0)}
+            keyPrefix={`${gpu.uuid}-usage`}
+          />
+          <MetricBarSeries
+            label="MEM"
+            values={memorySeries}
+            color="#58a6ff"
+            suffix="%"
+            displayValue={memoryCurrent.toFixed(0)}
+            keyPrefix={`${gpu.uuid}-memory`}
+          />
+          <MetricBarSeries
+            label="TMP"
+            values={temperatureSeries}
+            color={temperatureColor(temperatureCurrent)}
+            suffix="C"
+            displayValue={temperatureCurrent.toFixed(0)}
+            keyPrefix={`${gpu.uuid}-temperature`}
+          />
         </div>
       </div>
     </button>
+  )
+}
+
+function MetricBarSeries({
+  label,
+  values,
+  color,
+  suffix,
+  displayValue,
+  keyPrefix,
+}: {
+  label: string
+  values: number[]
+  color: string
+  suffix: string
+  displayValue: string
+  keyPrefix: string
+}) {
+  return (
+    <div className="rounded bg-[#071117]/70 px-1.5 py-1 border border-[#19313b]">
+      <div className="mb-1 flex items-center justify-between text-[9px]">
+        <span className="text-[#5c8f86]">{label}</span>
+        <span style={{ color }}>{displayValue}{suffix}</span>
+      </div>
+      <div className="h-7 flex items-end gap-[2px]">
+        {values.map((value, idx) => (
+          <div
+            key={`${keyPrefix}-${idx}`}
+            className="flex-1 rounded-[1px]"
+            style={{
+              height: `${Math.max(value, 6)}%`,
+              backgroundColor: idx === values.length - 1 ? color : `${color}66`,
+              opacity: 0.35 + (idx / values.length) * 0.65,
+            }}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
 

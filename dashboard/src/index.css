@@ -5,6 +5,14 @@
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
+  --crt-bg: #050a0d;
+  --crt-panel: #0b1419;
+  --crt-border: #19313b;
+  --crt-text: #9ce8d5;
+  --crt-dim: #5c8f86;
+  --crt-accent: #2ce6a6;
+  --crt-warning: #ffd166;
+  --crt-danger: #ff6b6b;
 }
 
 .dark {
@@ -13,5 +21,84 @@
 }
 
 body {
-  @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+  @apply text-gray-900 dark:text-gray-100;
+  background: radial-gradient(circle at 20% 10%, #112028 0%, var(--crt-bg) 45%, #020406 100%);
+  color: var(--crt-text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.crt-screen {
+  position: relative;
+}
+
+.crt-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.02) 0px,
+    rgba(255, 255, 255, 0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.25;
+}
+
+.crt-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+.crt-panel {
+  background: linear-gradient(180deg, rgba(11, 20, 25, 0.95), rgba(7, 13, 17, 0.95));
+  border: 1px solid var(--crt-border);
+  box-shadow: inset 0 0 0 1px rgba(44, 230, 166, 0.05), 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.crt-title {
+  color: var(--crt-accent);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.crt-muted {
+  color: var(--crt-dim);
+}
+
+.crt-glow {
+  text-shadow: 0 0 10px rgba(44, 230, 166, 0.45);
+}
+
+.crt-grid-bg {
+  background-image:
+    linear-gradient(rgba(44, 230, 166, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(44, 230, 166, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.terminal-chip {
+  border: 1px solid var(--crt-border);
+  background: rgba(16, 33, 41, 0.7);
+  color: var(--crt-text);
+}
+
+.terminal-btn {
+  border: 1px solid rgba(44, 230, 166, 0.35);
+  background: rgba(8, 26, 20, 0.8);
+  color: var(--crt-accent);
+}
+
+.terminal-btn:hover {
+  background: rgba(11, 38, 29, 0.92);
 }

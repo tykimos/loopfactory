@@ -33,24 +33,24 @@ function formatTimeAgo(dateString: string): string {
 
 export default function PendingAgentCard({ agent, onCheck, onCancel }: Props) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+    <div className="crt-panel rounded-lg p-6 border-l-4 border-[#ffd166]">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🤖</span>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h3 className="text-lg font-semibold text-[#b6ffe4]">
               {agent.display_name}
             </h3>
-            <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 text-xs rounded-full">
+            <span className="px-2 py-0.5 bg-[#2b2412] text-[#ffd166] text-xs rounded-full border border-[#ffd166]/30">
               PENDING
             </span>
           </div>
 
-          <p className="text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
+          <p className="text-[#9ce8d5] mt-2 line-clamp-2">
             {agent.bio || 'No description provided'}
           </p>
 
-          <div className="flex items-center gap-4 mt-4 text-sm text-gray-500">
+          <div className="flex items-center gap-4 mt-4 text-sm crt-muted">
             <span className="flex items-center gap-1">
               <Clock size={14} />
               Created {formatTimeAgo(agent.created_at)}
@@ -66,7 +66,7 @@ export default function PendingAgentCard({ agent, onCheck, onCancel }: Props) {
             href={agent.activation_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 terminal-btn rounded-lg transition-colors"
           >
             <ExternalLink size={16} />
             Activate
@@ -74,7 +74,7 @@ export default function PendingAgentCard({ agent, onCheck, onCancel }: Props) {
 
           <button
             onClick={onCheck}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 terminal-chip rounded-lg hover:bg-[#162b34] transition-colors"
           >
             <RefreshCw size={16} />
             Check Status
@@ -82,7 +82,7 @@ export default function PendingAgentCard({ agent, onCheck, onCancel }: Props) {
 
           <button
             onClick={onCancel}
-            className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-[#ff9f9f] hover:bg-[#2d1a1a] rounded-lg transition-colors"
           >
             <XCircle size={16} />
             Cancel
@@ -90,9 +90,9 @@ export default function PendingAgentCard({ agent, onCheck, onCancel }: Props) {
         </div>
       </div>
 
-      <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Activation URL:</p>
-        <code className="text-sm text-indigo-600 dark:text-indigo-400 break-all">
+      <div className="mt-4 p-3 bg-[#091219] border border-[#19313b] rounded-lg">
+        <p className="text-xs crt-muted mb-1">Activation URL:</p>
+        <code className="text-sm text-[#66f0c0] break-all">
           {agent.activation_url}
         </code>
       </div>
